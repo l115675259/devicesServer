@@ -4,6 +4,8 @@ from flask import Flask, request
 from werkzeug.utils import secure_filename
 
 from uitls.adbUtils import AdbUtils
+from uitls.debug import run
+from uitls.proxy import ProServer
 
 app = Flask(__name__)
 
@@ -50,6 +52,18 @@ def setDevicesProxy():
                                    httpProxy=rep["httpProxy"],
                                    serial=rep["serial"],
                                    batch=rep["batch"])
+
+
+@app.route("/setDeviceAndProxy", methods=["POST"])
+def setDeviceAndProxy():
+    if request.method == "POST":
+        status = request.json["status"]
+        if status == "1":
+            ProServer().run()
+            return {"status": "proxy on"}
+        elif status == "0":
+            ProServer().shutdown()
+            return {"status": "proxy off"}
 
 
 if __name__ == '__main__':

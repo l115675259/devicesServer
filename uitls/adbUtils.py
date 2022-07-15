@@ -140,7 +140,8 @@ class AdbDevices(AdbDevice):
                                 "packName": package_name,
                                 "versionCode": apk.manifest.version_code,
                                 "versioName": version_name,
-                                "apkPath": apk.apk_path
+                                "apkPath": apk.apk_path,
+                                "apkSize": humanize(info.size)
                                 }
                     }
 
@@ -225,3 +226,6 @@ class AdbUtils:
                 batchResults[str(deviceItem)] = openProxy(deviceItem)
 
         return batchResults
+
+    def getAndroidLog(self):
+        pass
