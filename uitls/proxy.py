@@ -54,7 +54,7 @@ class Addon(object):
         }
         # if "https://test1-api.520yidui.com/v3/video_room/recom_session" in flow.request.url:
         #     self.producer.send("kafkatest", json.dumps(http))
-        # print(http)
+        print(http)
         self.producer.send("kafkatest", json.dumps(http))
 
 
@@ -85,14 +85,22 @@ class ProServer:
         self.m.addons.add(Addon())
 
         # run mitmproxy in background, especially integrated with other server
+
         self.loop = asyncio.get_event_loop()
 
     def __config(self, arg):
         return dict(self.con.items(arg))
 
     def run(self):
-        threading.Thread(target=loop_in_thread, args=(self.loop, self.m)).start()
+        threading.Thread(target=loop_in_thread, args=(self.loop, self.m), name="mitmProxy_run").start()
 
     def shutdown(self):
-        threading.Thread(target=self.m.shutdown()).start()
+        threading.Thread(target=self.m.shutdown(), name="mitmProxy_shutdown").start()
 
+
+if __name__ == '__main__':
+    ProServer().run()
+
+    # time.sleep(5)
+    #
+    # ProServer().shutdown()

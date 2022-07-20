@@ -1,11 +1,9 @@
-import os
 
 from flask import Flask, request
 from werkzeug.utils import secure_filename
-
+from uitls.adbUtils import *
 from uitls.adbUtils import AdbUtils
-from uitls.debug import run
-from uitls.proxy import ProServer
+
 
 app = Flask(__name__)
 
@@ -58,13 +56,32 @@ def setDevicesProxy():
 def setDeviceAndProxy():
     if request.method == "POST":
         status = request.json["status"]
+
+        stop_threads = False
+        t1 = threading.Thread(target=AdbUtils().getAndroidLog, args=("c168f4d5", "1", lambda: stop_threads,))
         if status == "1":
-            ProServer().run()
+            t1.start()
             return {"status": "proxy on"}
         elif status == "0":
-            ProServer().shutdown()
+            # AdbUtils().getAndroidLog(request.json["serial"], status)
+            stop_threads = True
+            t1.join()
             return {"status": "proxy off"}
 
 
+@app.route("/setClipboard", methods=["POST"])
+def setClipboard():
+    if request.method == "POST":
+        rep = request.json
+        return AdbUtils().setClipboard(serial=rep["serial"], batch=rep["batch"], content=rep["content"])
+
+
+@app.route("/screenshot", methods=["POST"])
+def screenshot():
+    if request.method == "POST":
+        rep = request.json
+        return AdbUtils().screenshot(serial=rep["serial"], picPath=rep["picPath"])
+
+
 if __name__ == '__main__':
-    app.run()
+    app.run(Process=True)

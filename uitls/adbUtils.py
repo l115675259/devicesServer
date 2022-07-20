@@ -1,16 +1,20 @@
 import configparser
+import datetime
+import json
 import os
 import re
+import tempfile
 import time
 import typing
 
 import adbutils
 import apkutils2
 import requests
-from adbutils import AdbInstallError
+from PIL import UnidentifiedImageError, Image
+from adbutils import AdbDevice, AdbInstallError
 from adbutils._adb import BaseClient
-from adbutils._device import AdbDevice
 from adbutils._utils import ReadProgress, humanize
+from kafka import KafkaProducer
 from retry import retry
 
 
@@ -145,6 +149,26 @@ class AdbDevices(AdbDevice):
                                 }
                     }
 
+    def screenshot1(self, picDir) -> Image.Image:
+        """ not thread safe """
+        try:
+            inner_tmp_path = "/sdcard/tmp001.png"
+            self.shell(['rm', inner_tmp_path])
+            self.shell(["screencap", "-p", inner_tmp_path])
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                # target_path = os.path.join(tmpdir, "tmp001.png")0:-2]
+                target_path = os.path.join(picDir)
+                # print(target_path)
+                self.sync.pull(inner_tmp_path, target_path)
+                im = Image.open(target_path)
+                im.load()
+                self._width, self._height = im.size
+                return im.convert("RGB")
+        except UnidentifiedImageError:
+            w, h = self.window_size()
+            return Image.new("RGB", (w, h), (220, 120, 100))
+
 
 class AdbUtils:
 
@@ -158,6 +182,16 @@ class AdbUtils:
 
         # adb配置
         self.adb = adbutils.AdbClient(host=str(self.config["adb_hosts"]), port=int(self.config["adb_port"]))
+
+        # kafka
+        self.producer = KafkaProducer(bootstrap_servers=self.__config("kafka")["server"],
+                                      value_serializer=lambda m: json.dumps(m).encode())
+
+        # logcat
+        self.stream = False
+
+    def __config(self, arg):
+        return dict(self.con.items(arg))
 
     def getDevice(self, serial: str = None):
         """
@@ -178,6 +212,10 @@ class AdbUtils:
         if len(ds) == 0:
             return "Can't find any android device/emulator"
         if len(ds) >= 1:
+            # devicesStr = []
+            # for item in ds:
+            #     devicesStr.append(item.get_serialno())
+            # return devicesStr
             return ds
 
     def downloadApk(self, fileName, installApkUrl):
@@ -186,6 +224,13 @@ class AdbUtils:
             code.write(installApkUrl.content)
 
     def installApk(self, serial: str = None, installApkUrl: str = None, apkPath=None):
+        """
+        设备安装apk
+        :param serial:
+        :param installApkUrl:
+        :param apkPath:
+        :return:
+        """
 
         apkInfo = None
         device = self.getDevice(serial=serial)
@@ -199,6 +244,36 @@ class AdbUtils:
             return apkInfo
         else:
             return "未找到pack"
+
+    def setClipboard(self, serial, batch, content):
+        """
+        设置设备剪切板
+        :param serial:
+        :param batch:
+        :param content:
+        :return:
+        """
+
+        # 安装所需app并打开app
+        def checkApp(devices):
+            if "ca.zgrs.clipper" not in devices.list_packages():
+                devices.install(str(self.root_path) + "/static/uploadApk/clipper.apk")
+
+            devices.shell("am startservice ca.zgrs.clipper/.ClipboardService")
+            # devices.shell("am start ca.zgrs.clipper/.Main")
+
+        if batch == "0":
+            device = self.getDevice(serial)
+            checkApp(device)
+            device.shell(f"am broadcast -a clipper.set -e text \'{content}\'")
+            return {"status": "success"}
+        elif batch == "1" and serial == "0":
+            for device_item in self.getDevicesList():
+                checkApp(device_item)
+                device_item.shell(f"am broadcast -a clipper.set -e text \'{content}\'")
+            return {"status": "success"}
+        else:
+            return {"status": "fail"}
 
     def setProxy(self, status: bool, httpProxy: str, serial: str = "0", batch: bool = False):
         """
@@ -227,5 +302,42 @@ class AdbUtils:
 
         return batchResults
 
-    def getAndroidLog(self):
-        pass
+    def screenshot(self, serial, picPath):
+
+        if picPath[-1] != "/":
+            picPath = picPath + "/"
+
+        if serial != "0" and picPath is not None:
+            device = self.getDevice(serial=serial)
+            name = str(picPath) + str(device.get_serialno()) + "_" + datetime.datetime.now().strftime(
+                '%Y-%m-%d-%H:%M:%S') + ".png"
+            device.screenshot1(name)
+
+            return {"status": "success", "path": name}
+        else:
+            return {"status": "fail", "reasons": "参数错误"}
+
+    def getAndroidLog(self, serial, status, stop_threads):
+        """
+        获取Android logcat，并发送kafka
+        :param serial: 设备uuid
+        :param status: 状态开关
+        :return: None
+        """
+        d = self.getDevice(serial)
+        d.shell("logcat --clear")
+        stream = d.shell("logcat | grep TRACK_SENSORS", stream=True)
+        with stream:
+            f = stream.conn.makefile()
+
+            while True:
+                line = f.readline()
+                # print(line)
+                js_line = re.findall(r'\{.*\}', line.rstrip())[0]
+                dt_line = eval(
+                    js_line.replace("\"", "\'").replace("true", "True").replace("false", "False"))
+                # print(self.config["topic"])
+                print(dt_line)
+                self.producer.send("kafkatest", dt_line)
+
+
