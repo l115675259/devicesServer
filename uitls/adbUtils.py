@@ -4,8 +4,11 @@ import json
 import os
 import re
 import tempfile
+import threading
 import time
 import typing
+from concurrent.futures import ThreadPoolExecutor
+from queue import Queue
 
 import adbutils
 import apkutils2
@@ -16,6 +19,8 @@ from adbutils._adb import BaseClient
 from adbutils._utils import ReadProgress, humanize
 from kafka import KafkaProducer
 from retry import retry
+
+from uitls.thread import stop_thread
 
 
 class AdbDevices(AdbDevice):
@@ -187,9 +192,6 @@ class AdbUtils:
         self.producer = KafkaProducer(bootstrap_servers=self.__config("kafka")["server"],
                                       value_serializer=lambda m: json.dumps(m).encode())
 
-        # logcat
-        self.stream = False
-
     def __config(self, arg):
         return dict(self.con.items(arg))
 
@@ -204,7 +206,7 @@ class AdbUtils:
         if serial is None:
             return self.adb.device_list()[0]
 
-    def getDevicesList(self):
+    def getDevicesList(self, serialName):
         """
             获取设备列表
         """
@@ -212,11 +214,13 @@ class AdbUtils:
         if len(ds) == 0:
             return "Can't find any android device/emulator"
         if len(ds) >= 1:
-            # devicesStr = []
-            # for item in ds:
-            #     devicesStr.append(item.get_serialno())
-            # return devicesStr
-            return ds
+            if serialName == "0":
+                return ds
+            else:
+                devicesStr = []
+                for item in ds:
+                    devicesStr.append(item.get_serialno())
+                return devicesStr
 
     def downloadApk(self, fileName, installApkUrl):
         pathName = self.root_path + "/static/apk" + fileName
@@ -259,6 +263,7 @@ class AdbUtils:
             if "ca.zgrs.clipper" not in devices.list_packages():
                 devices.install(str(self.root_path) + "/static/uploadApk/clipper.apk")
 
+            devices.shell("am force-stop ca.zgrs.clipper/.ClipboardService")
             devices.shell("am startservice ca.zgrs.clipper/.ClipboardService")
             # devices.shell("am start ca.zgrs.clipper/.Main")
 
@@ -268,7 +273,7 @@ class AdbUtils:
             device.shell(f"am broadcast -a clipper.set -e text \'{content}\'")
             return {"status": "success"}
         elif batch == "1" and serial == "0":
-            for device_item in self.getDevicesList():
+            for device_item in self.getDevicesList(serialName="0"):
                 checkApp(device_item)
                 device_item.shell(f"am broadcast -a clipper.set -e text \'{content}\'")
             return {"status": "success"}
@@ -297,7 +302,7 @@ class AdbUtils:
         if batch == "0":
             batchResults[str(self.getDevice(serial=serial))] = openProxy(self.getDevice(serial=serial))
         elif batch == "1":
-            for deviceItem in self.getDevicesList():
+            for deviceItem in self.getDevicesList(serialName="0"):
                 batchResults[str(deviceItem)] = openProxy(deviceItem)
 
         return batchResults
@@ -317,27 +322,90 @@ class AdbUtils:
         else:
             return {"status": "fail", "reasons": "参数错误"}
 
-    def getAndroidLog(self, serial, status, stop_threads):
+    def getAndroidLog(self):
         """
         获取Android logcat，并发送kafka
         :param serial: 设备uuid
-        :param status: 状态开关
         :return: None
         """
-        d = self.getDevice(serial)
-        d.shell("logcat --clear")
-        stream = d.shell("logcat | grep TRACK_SENSORS", stream=True)
-        with stream:
-            f = stream.conn.makefile()
 
-            while True:
-                line = f.readline()
-                # print(line)
-                js_line = re.findall(r'\{.*\}', line.rstrip())[0]
-                dt_line = eval(
-                    js_line.replace("\"", "\'").replace("true", "True").replace("false", "False"))
-                # print(self.config["topic"])
-                print(dt_line)
-                self.producer.send("kafkatest", dt_line)
+        # class GetLogThread(threading.Thread):
+        #     def __init__(self, deviceItem, producer, config):
+        #         threading.Thread.__init__(self)
+        #         # self.threadID = threadID
+        #         # self.name = name
+        #         # self.q = q
+        #         self.deviceItem = deviceItem
+        #         self.producer = producer
+        #         self.config = config
+        #
+        #     def run(self):
+        #         self.deviceItem.shell("logcat --clear")
+        #         stream = self.deviceItem.shell("logcat | grep TRACK_SENSORS", stream=True)
+        #
+        #         with stream:
+        #             f = stream.conn.makefile()
+        #             while True:
+        #                 line = f.readline()
+        #                 js_line = re.findall(r'\{.*\}', line.rstrip())[0]
+        #                 dt_line = eval(
+        #                     js_line.replace("\"", "\'").replace("true", "True").replace("false", "False"))
+        #                 # print(self.config["topic"])
+        #                 dt_line["serialName"] = str(self.deviceItem)
+        #                 print(dt_line)
+        #                 self.producer.send(str(self.config[1][1])[1:-1], dt_line)
+
+        threads = []
+        for deviceItem in self.getDevicesList(serialName="0"):
+            # tName = str(deviceItem) + "_logcat"
+            thread = GetLogThread(deviceItem, self.producer, self.con.items('kafka'))
+            # thread.start()
+            threads.append(thread)
+
+        return threads
+        # stop_thread(threads[0])
+        # stop_thread(threads[1])
+        # stop_thread(threads[2])
+
+        # a = []
+        # for item in self.getDevicesList(serialName="0"):
+        #     a.append(threading.Thread(target=getLog, args=(item, )).start())
+        #
+        # return a
+        # if batch == "0":
+        #     device = self.getDevice(serial)
+        #     getLog(device)
+        # elif batch == "1":
+        #     devices = self.getDevicesList(serialName="0")
+        #     for item in devices:
+        #         print(item)
+        #         # serialName = devices[devices.index(item)]
+        #         getLog(item)
 
 
+#
+# if __name__ == '__main__':
+#     a = AdbUtils().getAndroidLog()
+#     print(a)
+    # stop_thread(a[0])
+    # stop_thread(a[1])
+
+
+    # a = []
+    # for item in AdbUtils().getDevicesList(serialName="0"):
+    #     # t =
+    #     a.append(threading.Thread(target=AdbUtils().getAndroidLog, args=(item,)).start())
+    #     # q.put(t)
+
+    # print(a)
+
+    # a = threading.Thread(target=AdbUtils().getAndroidLog(batch="1", serial="0"))
+    # a.start()
+#     print(a)
+#     stop_thread(a)
+
+# pool = ThreadPoolExecutor(10)
+# pool.submit(AdbUtils().getAndroidLog, "c168f4d5")
+# pool.map(AdbUtils().getAndroidLog, "1B261FDF600885")
+# for i in pool.map():
+# print(threading.enumerate())
