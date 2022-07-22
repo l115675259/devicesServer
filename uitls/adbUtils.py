@@ -322,43 +322,51 @@ class AdbUtils:
         else:
             return {"status": "fail", "reasons": "参数错误"}
 
-    def getAndroidLog(self):
+    def getAndroidLog(self, stream_stop=False):
         """
         获取Android logcat，并发送kafka
-        :param serial: 设备uuid
         :return: None
         """
 
-        # class GetLogThread(threading.Thread):
-        #     def __init__(self, deviceItem, producer, config):
-        #         threading.Thread.__init__(self)
-        #         # self.threadID = threadID
-        #         # self.name = name
-        #         # self.q = q
-        #         self.deviceItem = deviceItem
-        #         self.producer = producer
-        #         self.config = config
-        #
-        #     def run(self):
-        #         self.deviceItem.shell("logcat --clear")
-        #         stream = self.deviceItem.shell("logcat | grep TRACK_SENSORS", stream=True)
-        #
-        #         with stream:
-        #             f = stream.conn.makefile()
-        #             while True:
-        #                 line = f.readline()
-        #                 js_line = re.findall(r'\{.*\}', line.rstrip())[0]
-        #                 dt_line = eval(
-        #                     js_line.replace("\"", "\'").replace("true", "True").replace("false", "False"))
-        #                 # print(self.config["topic"])
-        #                 dt_line["serialName"] = str(self.deviceItem)
-        #                 print(dt_line)
-        #                 self.producer.send(str(self.config[1][1])[1:-1], dt_line)
+        class GetLogThread(threading.Thread):
+            def __init__(self, deviceItem, producer, config, stream_stop):
+                threading.Thread.__init__(self)
+                self.deviceItem = deviceItem
+                self.producer = producer
+                self.config = config
+                self.stream_stop = stream_stop
+
+            def run(self):
+                self.deviceItem.shell("logcat --clear")
+                stream = self.deviceItem.shell("logcat | grep TRACK_SENSORS", stream=True)
+
+                with stream:
+                    f = stream.conn.makefile()
+
+                    while True:
+                        if self.stream_stop():
+                            f.close()
+                        else:
+                            f = stream.conn.makefile()
+
+                        line = f.readline()
+                        js_line = re.findall(r'\{.*\}', line.rstrip())[0]
+                        dt_line = eval(
+                            js_line.replace("\"", "\'").replace("true", "True").replace("false", "False"))
+                        # print(self.config["topic"])
+                        dt_line["serialName"] = str(self.deviceItem)
+                        print(dt_line)
+                        self.producer.send(str(self.config[1][1])[1:-1], dt_line)
 
         threads = []
+        # stop_threads = False
         for deviceItem in self.getDevicesList(serialName="0"):
             # tName = str(deviceItem) + "_logcat"
-            thread = GetLogThread(deviceItem, self.producer, self.con.items('kafka'))
+            thread = GetLogThread(deviceItem,
+                                  self.producer,
+                                  self.con.items('kafka'),
+                                  lambda: stream_stop,
+                                  )
             # thread.start()
             threads.append(thread)
 
@@ -383,12 +391,15 @@ class AdbUtils:
         #         getLog(item)
 
 
-#
 # if __name__ == '__main__':
 #     a = AdbUtils().getAndroidLog()
 #     print(a)
-    # stop_thread(a[0])
-    # stop_thread(a[1])
+#     a[0].start()
+#     a[1].start()
+#     stop_thread(a[0])
+#     stop_thread(a[1])
+    # print(a)
+    # a[0].start()
 
 
     # a = []

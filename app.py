@@ -6,9 +6,31 @@ from uitls.adbUtils import *
 from uitls.adbUtils import AdbUtils
 
 # from queue import Queue
+from uitls.thread import GetLogThread
 
 app = Flask(__name__)
-AndroidLog_threads = AdbUtils().getAndroidLog()
+
+
+# 加载AndroidLogcat设备进程
+threads = []
+stream_stop = False
+root_path = os.path.dirname(__file__)
+con = configparser.ConfigParser()
+con.read(root_path + "/config.ini", encoding='utf-8')
+config = dict(con.items('kafka'))
+producer = KafkaProducer(bootstrap_servers=dict(con.items("kafka"))["server"],
+                         value_serializer=lambda m: json.dumps(m).encode())
+for deviceItem in AdbUtils().getDevicesList(serialName="0"):
+    tName = str(deviceItem) + "_logcat"
+    thread = GetLogThread(deviceItem,
+                          producer,
+                          lambda: stream_stop,
+                          tName,
+                          config
+                          )
+    thread.start()
+    threads.append(thread)
+
 
 @app.route("/install")
 def install():
@@ -53,15 +75,12 @@ def setDevicesProxy():
 def setDeviceAndProxy():
     if request.method == "POST":
         rep = request.json
-
+        global stream_stop
         if rep["status"] == "1":
-            print(AndroidLog_threads)
-            for i in AndroidLog_threads:
-                i.start()
+            stream_stop = False
             return {"status": "proxy on"}
         elif rep["status"] == "0":
-            for i in AndroidLog_threads:
-                stop_thread(i)
+            stream_stop = True
             return {"status": "proxy off"}
 
 
