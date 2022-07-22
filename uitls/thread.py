@@ -52,5 +52,6 @@ class GetLogThread(threading.Thread):
                 if self.stream_stop():
                     pass
                 else:
+                    # topic
                     # print(self.config["topic"][1:-1])
                     self.producer.send("kafkatest", dt_line)
