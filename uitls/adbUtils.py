@@ -4,11 +4,8 @@ import json
 import os
 import re
 import tempfile
-import threading
 import time
 import typing
-from concurrent.futures import ThreadPoolExecutor
-from queue import Queue
 
 import adbutils
 import apkutils2
@@ -19,8 +16,6 @@ from adbutils._adb import BaseClient
 from adbutils._utils import ReadProgress, humanize
 from kafka import KafkaProducer
 from retry import retry
-
-from uitls.thread import stop_thread
 
 
 class AdbDevices(AdbDevice):

@@ -1,15 +1,12 @@
-import threading
-
 from flask import Flask, request
 from werkzeug.utils import secure_filename
+
 from uitls.adbUtils import *
 from uitls.adbUtils import AdbUtils
-
-# from queue import Queue
+from uitls.osUtils import OsUtils
 from uitls.thread import GetLogThread
 
 app = Flask(__name__)
-
 
 # 加载AndroidLogcat设备进程
 threads = []
@@ -30,6 +27,9 @@ for deviceItem in AdbUtils().getDevicesList(serialName="0"):
                           )
     thread.start()
     threads.append(thread)
+
+# 开启mitmProxy功能
+OsUtils().proxy("0")
 
 
 @app.route("/getDevicesList", methods=['GET'])
@@ -93,4 +93,4 @@ def screenshot():
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(Process=True)

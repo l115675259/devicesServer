@@ -1,6 +1,7 @@
 import configparser
 import json
 import os
+
 from kafka import KafkaProducer
 
 
