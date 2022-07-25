@@ -46,12 +46,9 @@ class GetLogThread(threading.Thread):
                 js_line = re.findall(r'\{.*\}', line.rstrip())[0]
                 dt_line = eval(
                     js_line.replace("\"", "\'").replace("true", "True").replace("false", "False"))
-                # print(self.config["topic"])
                 dt_line["serialName"] = str(self.deviceItem)
                 print(dt_line)
                 if self.stream_stop():
                     pass
                 else:
-                    # topic
-                    # print(self.config["topic"][1:-1])
-                    self.producer.send("kafkatest", dt_line)
+                    self.producer.send(self.config["topic"][1:-1], dt_line)

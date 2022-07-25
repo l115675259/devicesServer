@@ -32,12 +32,6 @@ for deviceItem in AdbUtils().getDevicesList(serialName="0"):
     threads.append(thread)
 
 
-@app.route("/install")
-def install():
-    body = request.json
-    install().installApk(body["installApkUrl"])
-
-
 @app.route("/getDevicesList", methods=['GET'])
 def getDevicesList():
     return str(AdbUtils().getDevicesList(serialName="1"))
