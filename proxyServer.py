@@ -6,7 +6,7 @@ from mitmdump import DumpMaster, Options
 from mitmproxy.http import HTTPFlow
 
 # sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from uitls.config import InitConfig
+from utils.config import InitConfig
 
 
 class AddHeader:

@@ -1,10 +1,10 @@
 from flask import Flask, request
 from werkzeug.utils import secure_filename
 
-from uitls.adbUtils import *
-from uitls.adbUtils import AdbUtils
-from uitls.osUtils import OsUtils
-from uitls.thread import GetLogThread
+from utils.adbUtils import *
+from utils.adbUtils import AdbUtils
+from utils.osUtils import OsUtils
+from utils.thread import GetLogThread
 
 app = Flask(__name__)
 
