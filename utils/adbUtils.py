@@ -212,9 +212,9 @@ class AdbUtils:
             if serialName == "0":
                 return ds
             else:
-                devicesStr = []
+                devicesStr = {}
                 for item in ds:
-                    devicesStr.append(item.get_serialno())
+                    devicesStr[item.shell("getprop ro.product.model")] = item.get_serialno()
                 return devicesStr
 
     def downloadApk(self, fileName, installApkUrl):
