@@ -207,15 +207,15 @@ class AdbUtils:
         """
         ds = self.adb.device_list()
         if len(ds) == 0:
-            return "Can't find any android device/emulator"
+            return "Can't find any androd device/emulator"
         if len(ds) >= 1:
             if serialName == "0":
                 return ds
             else:
                 devicesStr = {}
                 for item in ds:
-                    devicesStr[item.shell("getprop ro.product.model")] = item.get_serialno()
-                return devicesStr
+                    devicesStr[item.shell("getprop ro.product.model").replace(" ", "")] = item.get_serialno()
+                return json.dumps(devicesStr)
 
     def downloadApk(self, fileName, installApkUrl):
         pathName = self.root_path + "/static/apk" + fileName

@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, Response
 from werkzeug.utils import secure_filename
 
 from utils.adbUtils import *
@@ -29,12 +29,12 @@ for deviceItem in AdbUtils().getDevicesList(serialName="0"):
     threads.append(thread)
 
 # 开启mitmProxy功能
-OsUtils().proxy("0")
+# OsUtils().proxy("0")
 
 
 @app.route("/getDevicesList", methods=['GET'])
 def getDevicesList():
-    return str(AdbUtils().getDevicesList(serialName="1"))
+    return Response(AdbUtils().getDevicesList(serialName="1"), mimetype='application/json')
 
 
 @app.route("/installApk", methods=['POST'])
@@ -65,7 +65,7 @@ def setDevicesProxy():
                                    batch=rep["batch"])
 
 
-@app.route("/setDeviceAndProxy", methods=["POST"])
+@app.route("/setSensors", methods=["POST"])
 def setDeviceAndProxy():
     if request.method == "POST":
         rep = request.json
