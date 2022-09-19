@@ -9,24 +9,24 @@ from utils.thread import GetLogThread
 app = Flask(__name__)
 
 # 加载AndroidLogcat设备进程
-threads = []
-stream_stop = False
-root_path = os.path.dirname(__file__)
-con = configparser.ConfigParser()
-con.read(root_path + "/config.ini", encoding='utf-8')
-config = dict(con.items('kafka'))
-producer = KafkaProducer(bootstrap_servers=dict(con.items("kafka"))["server"],
-                         value_serializer=lambda m: json.dumps(m).encode())
-for deviceItem in AdbUtils().getDevicesList(serialName="0"):
-    tName = str(deviceItem) + "_logcat"
-    thread = GetLogThread(deviceItem,
-                          producer,
-                          lambda: stream_stop,
-                          tName,
-                          config
-                          )
-    thread.start()
-    threads.append(thread)
+# threads = []
+# stream_stop = False
+# root_path = os.path.dirname(__file__)
+# con = configparser.ConfigParser()
+# con.read(root_path + "/config.ini", encoding='utf-8')
+# config = dict(con.items('kafka'))
+# producer = KafkaProducer(bootstrap_servers=dict(con.items("kafka"))["server"],
+#                          value_serializer=lambda m: json.dumps(m).encode())
+# for deviceItem in AdbUtils().getDevicesList(serialName="0"):
+#     tName = str(deviceItem) + "_logcat"
+#     thread = GetLogThread(deviceItem,
+#                           producer,
+#                           lambda: stream_stop,
+#                           tName,
+#                           config
+#                           )
+#     thread.start()
+#     threads.append(thread)
 
 # 开启mitmProxy功能
 # OsUtils().proxy("0")

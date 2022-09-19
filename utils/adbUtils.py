@@ -184,8 +184,8 @@ class AdbUtils:
         self.adb = adbutils.AdbClient(host=str(self.config["adb_hosts"]), port=int(self.config["adb_port"]))
 
         # kafka
-        self.producer = KafkaProducer(bootstrap_servers=self.__config("kafka")["server"],
-                                      value_serializer=lambda m: json.dumps(m).encode())
+        # self.producer = KafkaProducer(bootstrap_servers=self.__config("kafka")["server"],
+        #                               value_serializer=lambda m: json.dumps(m).encode())
 
     def __config(self, arg):
         return dict(self.con.items(arg))
